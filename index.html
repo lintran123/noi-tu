@@ -201,8 +201,9 @@
     </div>
   </div>
 
-  <p class="note">Kết nối qua mạng WebRTC công khai. Nếu không kết nối được (mạng công ty/trường chặn), thử dùng wifi khác hoặc 4G.</p>
+  <div id="debug-log" style="background:#0f0f0e; border:1px solid #3d3d39; border-radius:8px; padding:10px; font-size:11px; font-family:monospace; color:#8fa88f; max-height:140px; overflow-y:auto; margin-top:14px;"></div>
 </div>
+
 
 <script>
   const setupScreen = document.getElementById('setup-screen');
@@ -304,7 +305,18 @@
     });
   }
 
-  const peerConfig = {
+  function log(text) {
+    const debugLog = document.getElementById('debug-log');
+    if (!debugLog) return;
+    const line = document.createElement('div');
+    const t = new Date().toLocaleTimeString();
+    line.textContent = '[' + t + '] ' + text;
+    debugLog.appendChild(line);
+    debugLog.scrollTop = debugLog.scrollHeight;
+  }
+
+  log(typeof Peer === 'undefined' ? 'LỖI: thư viện PeerJS không tải được (kiểm tra mạng/CDN)' : 'Thư viện PeerJS đã tải OK');
+
     config: {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -319,19 +331,24 @@
     myRole = 1;
     const code = randomCode();
     createBtn.disabled = true;
+    log('Đang tạo phòng với mã: ' + code);
     peer = new Peer(code, peerConfig);
     peer.on('open', (id) => {
+      log('Peer đã mở thành công, ID: ' + id);
       hostCodeArea.classList.remove('hidden');
       hostCodeEl.textContent = id;
     });
     peer.on('connection', (connection) => {
+      log('Có người kết nối vào! Đang bắt tay...');
       hostStatus.textContent = 'Đã có người kết nối!';
       setupConnection(connection);
     });
     peer.on('error', (err) => {
+      log('LỖI phía host: ' + err.type + ' - ' + (err.message || ''));
       hostStatus.textContent = 'Lỗi: ' + err.type + '. Thử tạo phòng lại.';
       createBtn.disabled = false;
     });
+    peer.on('disconnected', () => log('Peer bị ngắt kết nối khỏi server tín hiệu'));
   });
 
   copyBtn.addEventListener('click', () => {
@@ -350,27 +367,34 @@
     myRole = 2;
     joinBtn.disabled = true;
     joinStatus.textContent = 'Đang kết nối...';
+    log('Đang thử vào phòng mã: ' + code);
     peer = new Peer(peerConfig);
-    peer.on('open', () => {
+    peer.on('open', (myId) => {
+      log('Peer của bạn đã mở, ID: ' + myId + '. Đang gọi tới phòng...');
       const connection = peer.connect(code);
       const timeoutId = setTimeout(() => {
+        log('LỖI: quá 15 giây không bắt tay xong (có thể do NAT/tường lửa)');
         joinStatus.textContent = 'Kết nối quá lâu. Mạng của bạn hoặc người tạo phòng có thể đang chặn. Thử đổi sang wifi khác hoặc 4G rồi thử lại.';
         joinBtn.disabled = false;
       }, 15000);
       connection.on('open', () => {
+        log('Bắt tay thành công! Đã kết nối.');
         clearTimeout(timeoutId);
         setupConnection(connection);
       });
-      connection.on('error', () => {
+      connection.on('error', (err) => {
+        log('LỖI kết nối data channel: ' + (err.message || err));
         clearTimeout(timeoutId);
         joinStatus.textContent = 'Không kết nối được. Kiểm tra lại mã phòng.';
         joinBtn.disabled = false;
       });
     });
     peer.on('error', (err) => {
+      log('LỖI phía join: ' + err.type + ' - ' + (err.message || ''));
       joinStatus.textContent = 'Lỗi: ' + err.type + '. Kiểm tra lại mã phòng.';
       joinBtn.disabled = false;
     });
+    peer.on('disconnected', () => log('Peer bị ngắt kết nối khỏi server tín hiệu'));
   });
 
   form.addEventListener('submit', (e) => {
