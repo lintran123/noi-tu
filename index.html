@@ -4,7 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nối từ online (P2P)</title>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js" onerror="this.dataset.failed='1'"></script>
+<script>
+  if (typeof Peer === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"><\/script>');
+  }
+</script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -315,7 +320,16 @@
     debugLog.scrollTop = debugLog.scrollHeight;
   }
 
-  log(typeof Peer === 'undefined' ? 'LỖI: thư viện PeerJS không tải được (kiểm tra mạng/CDN)' : 'Thư viện PeerJS đã tải OK');
+  const libOk = typeof Peer !== 'undefined';
+  log(libOk ? 'Thư viện PeerJS đã tải OK' : 'LỖI: thư viện PeerJS không tải được từ cả 2 nguồn (mạng của bạn có thể đang chặn CDN)');
+  if (!libOk) {
+    createBtn.disabled = true;
+    joinBtn.disabled = true;
+    createBtn.textContent = 'Không dùng được (lỗi tải thư viện)';
+    joinBtn.textContent = 'Không dùng được (lỗi tải thư viện)';
+    hostStatus.textContent = '';
+    joinStatus.textContent = 'Thiết bị này không tải được thư viện cần thiết. Thử đổi mạng (wifi/4G khác) hoặc trình duyệt khác.';
+  }
 
     config: {
       iceServers: [
@@ -328,6 +342,7 @@
   };
 
   createBtn.addEventListener('click', () => {
+    try {
     myRole = 1;
     const code = randomCode();
     createBtn.disabled = true;
@@ -349,6 +364,10 @@
       createBtn.disabled = false;
     });
     peer.on('disconnected', () => log('Peer bị ngắt kết nối khỏi server tín hiệu'));
+    } catch (e) {
+      log('LỖI JS khi tạo phòng: ' + e.message);
+      createBtn.disabled = false;
+    }
   });
 
   copyBtn.addEventListener('click', () => {
@@ -359,6 +378,7 @@
   });
 
   joinBtn.addEventListener('click', () => {
+    try {
     const code = joinCodeInput.value.trim();
     if (!code) {
       joinStatus.textContent = 'Nhập mã phòng trước đã.';
@@ -395,6 +415,10 @@
       joinBtn.disabled = false;
     });
     peer.on('disconnected', () => log('Peer bị ngắt kết nối khỏi server tín hiệu'));
+    } catch (e) {
+      log('LỖI JS khi vào phòng: ' + e.message);
+      joinBtn.disabled = false;
+    }
   });
 
   form.addEventListener('submit', (e) => {
